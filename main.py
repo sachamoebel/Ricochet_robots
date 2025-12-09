@@ -1,6 +1,9 @@
 import pygame
 import random
 from dataclasses import dataclass
+
+from pygame import RESIZABLE
+
 from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
@@ -28,7 +31,7 @@ class Target:
 class Game:
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), RESIZABLE)
         pygame.display.set_caption("Rasende Roboter")
         self.clock = pygame.time.Clock()
         self.running = True
