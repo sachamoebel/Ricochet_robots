@@ -1,7 +1,7 @@
 import pygame
 import random
 from typing import Set, Tuple, List, FrozenSet
-from config import GRID_COLS, GRID_ROWS, CENTER_BLOCK_COLOR
+from config import GRID_COLS, GRID_ROWS, CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS
 from entities import Cell, Wall, cell_rect
 
 
@@ -34,14 +34,8 @@ class Board:
                 res.add((nc, nr))
         return res
 
-    def _cells_for_wall(self, kind: str, angle: int, col: int, row: int) -> Set[Tuple[int, int]]:
-        cells: Set[Tuple[int, int]] = {(col, row)}
-        if kind == "S":
-            if angle in (0, 180):
-                cells.add((col + 1, row))
-            else:
-                cells.add((col, row + 1))
-        return cells
+    def _cells_for_wall(self, col: int, row: int) -> Set[Tuple[int, int]]:
+        return {(col, row)}
 
     def _create_random_walls(self) -> None:
         min_walls = 8
@@ -52,24 +46,13 @@ class Board:
         max_attempts = n_walls * 40
         while len(self.walls) < n_walls and attempts < max_attempts:
             attempts += 1
-            kind = random.choice(["L", "S"])
+            kind = "L"
             angle = random.choice([0, 90, 180, 270])
             col = random.randint(0, self.cols - 1)
             row = random.randint(0, self.rows - 1)
             if (col, row) in self.center_block_cells:
                 continue
-            if kind == "S":
-                if angle in (0, 180):
-                    if col >= self.cols - 1:
-                        continue
-                    if (col + 1, row) in self.center_block_cells:
-                        continue
-                else:
-                    if row >= self.rows - 1:
-                        continue
-                    if (col, row + 1) in self.center_block_cells:
-                        continue
-            wall_cells = self._cells_for_wall(kind, angle, col, row)
+            wall_cells = self._cells_for_wall(col, row)
             if any(cell in forbidden for cell in wall_cells):
                 continue
             self.walls.append(Wall(col=col, row=row, angle=angle, kind=kind))
@@ -99,27 +82,6 @@ class Board:
                 elif wall.angle == 270:
                     self._add_edge_block(c, r, c, r + 1)
                     self._add_edge_block(c, r, c - 1, r)
-            else:
-                if wall.angle in (0, 180):
-                    c2 = c + 1
-                    if wall.angle == 0:
-                        self._add_edge_block(c, r, c, r - 1)
-                        self._add_edge_block(c, r, c2, r)
-                        self._add_edge_block(c2, r, c2, r + 1)
-                    else:
-                        self._add_edge_block(c, r, c, r + 1)
-                        self._add_edge_block(c, r, c2, r)
-                        self._add_edge_block(c2, r, c2, r - 1)
-                else:
-                    r2 = r + 1
-                    if wall.angle == 90:
-                        self._add_edge_block(c, r, c - 1, r)
-                        self._add_edge_block(c, r, c, r2)
-                        self._add_edge_block(c, r2, c + 1, r2)
-                    else:
-                        self._add_edge_block(c, r, c + 1, r)
-                        self._add_edge_block(c, r, c, r2)
-                        self._add_edge_block(c, r2, c - 1, r2)
 
     def is_blocked(self, col: int, row: int) -> bool:
         return (col, row) in self.blocked_cells
@@ -142,6 +104,8 @@ class Board:
                 nx = c + dx
                 ny = r + dy
                 if not (0 <= nx < self.cols and 0 <= ny < self.rows):
+                    obstacle_found = True
+                    stop_c, stop_r = c, r
                     break
                 if frozenset({(c, r), (nx, ny)}) in self.blocked_edges:
                     obstacle_found = True
@@ -165,3 +129,5 @@ class Board:
                 self.cells[col][row].draw(surface, screen_width, screen_height)
         for wall in self.walls:
             wall.draw(surface, screen_width, screen_height)
+        border_rect = pygame.Rect(0, 0, screen_width, screen_height)
+        pygame.draw.rect(surface, WALL_COLOR, border_rect, WALL_THICKNESS)
