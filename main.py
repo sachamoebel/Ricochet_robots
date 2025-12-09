@@ -2,20 +2,17 @@ import pygame
 import random
 from dataclasses import dataclass
 
-from pygame import RESIZABLE
-
 from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BG_COLOR,
     GRID_COLS,
     GRID_ROWS,
-    CELL_WIDTH,
-    CELL_HEIGHT,
     SELECT_TARGET_COLOR,
     ROBOT_COLORS,
     TARGET_CENTER_COLOR,
     GOAL_OUTLINE_COLOR,
+    get_cell_size,
 )
 from board import Board
 from entities import Robot, grid_to_pixel_center, cell_rect
@@ -31,14 +28,23 @@ class Target:
 class Game:
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), RESIZABLE)
+        self.screen = pygame.display.set_mode(
+            (SCREEN_WIDTH, SCREEN_HEIGHT),
+            pygame.RESIZABLE,
+        )
         pygame.display.set_caption("Rasende Roboter")
         self.clock = pygame.time.Clock()
         self.running = True
+
         self.board = Board(GRID_COLS, GRID_ROWS)
-        robot_radius = min(CELL_WIDTH, CELL_HEIGHT) // 3
+
+        width, height = self.screen.get_size()
+        cell_w, cell_h = get_cell_size(width, height)
+        robot_radius = min(cell_w, cell_h) // 3
+
         self.robots: list[Robot] = []
         self._spawn_random_robots(4, robot_radius)
+
         self.selected_robot: Robot | None = None
         self.reachable_cells: set[tuple[int, int]] = set()
         self.target: Target = self._create_random_target()
@@ -88,10 +94,13 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                width, height = self.screen.get_size()
+                cell_w, cell_h = get_cell_size(width, height)
                 x, y = event.pos
-                col = x // CELL_WIDTH
-                row = y // CELL_HEIGHT
+                col = x // cell_w
+                row = y // cell_h
                 if 0 <= col < GRID_COLS and 0 <= row < GRID_ROWS:
                     robot = self._get_robot_at(col, row)
                     if robot is not None:
@@ -116,46 +125,59 @@ class Game:
                         self.selected_robot = None
                         self.reachable_cells.clear()
 
+            elif event.type == pygame.VIDEORESIZE:
+                # On NE rappelle PAS set_mode ici.
+                # On laisse juste Pygame redimensionner la surface.
+                # Tout le rendu utilise self.screen.get_size() à chaque frame.
+                pass
+
     def update(self) -> None:
         pass
 
-    def _draw_target_center(self) -> None:
-        center_x = SCREEN_WIDTH // 2
-        center_y = SCREEN_HEIGHT // 2
+    def _draw_target_center(self, width: int, height: int) -> None:
+        center_x = width // 2
+        center_y = height // 2
         color = self.robots[self.target.robot_index].color
-        radius_outer = min(CELL_WIDTH, CELL_HEIGHT) // 3
+        cell_w, cell_h = get_cell_size(width, height)
+        radius_outer = min(cell_w, cell_h) // 3
         radius_inner = radius_outer // 2
         pygame.draw.circle(self.screen, TARGET_CENTER_COLOR, (center_x, center_y), radius_outer)
         pygame.draw.circle(self.screen, color, (center_x, center_y), radius_inner)
 
-    def _draw_goal_cell(self) -> None:
-        rect = cell_rect(self.target.goal_col, self.target.goal_row)
+    def _draw_goal_cell(self, width: int, height: int) -> None:
+        rect = cell_rect(self.target.goal_col, self.target.goal_row, width, height)
         pygame.draw.rect(self.screen, GOAL_OUTLINE_COLOR, rect, 3)
 
     def _draw_hud(self) -> None:
         text = f"Coups: {self.move_count} | Robot cible: {self.target.robot_index + 1}"
-        surf = self.font.render(text, True, (0, 0, 0))
+        surf = self.font.render(text, True, (255, 255, 255))
         self.screen.blit(surf, (10, 10))
 
     def draw(self) -> None:
+        width, height = self.screen.get_size()
         self.screen.fill(BG_COLOR)
-        self.board.draw(self.screen)
-        self._draw_goal_cell()
+
+        self.board.draw(self.screen, width, height)
+        self._draw_goal_cell(width, height)
+
         for idx, robot in enumerate(self.robots):
-            robot.draw(self.screen)
+            robot.draw(self.screen, width, height)
             if idx == self.target.robot_index:
-                x, y = grid_to_pixel_center(robot.col, robot.row)
-                r = robot.radius + 4
+                x, y = grid_to_pixel_center(robot.col, robot.row, width, height)
+                cell_w, cell_h = get_cell_size(width, height)
+                r = min(cell_w, cell_h) // 3 + 4
                 pygame.draw.circle(self.screen, (255, 255, 255), (x, y), r, 2)
+
         for col, row in self.reachable_cells:
-            x, y = grid_to_pixel_center(col, row)
-            radius = min(CELL_WIDTH, CELL_HEIGHT) // 6
+            x, y = grid_to_pixel_center(col, row, width, height)
+            cell_w, cell_h = get_cell_size(width, height)
+            radius = min(cell_w, cell_h) // 6
             pygame.draw.circle(self.screen, SELECT_TARGET_COLOR, (x, y), radius)
-        self._draw_target_center()
+
+        self._draw_target_center(width, height)
         self._draw_hud()
         pygame.display.flip()
 
 
 if __name__ == "__main__":
     Game().run()
-

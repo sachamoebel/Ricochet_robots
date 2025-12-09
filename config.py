@@ -4,8 +4,9 @@ SCREEN_HEIGHT = 1440
 GRID_COLS = 16
 GRID_ROWS = 16
 
-CELL_WIDTH = SCREEN_WIDTH // GRID_COLS
-CELL_HEIGHT = SCREEN_HEIGHT // GRID_ROWS
+def get_cell_size(screen_width, screen_height):
+    return screen_width // GRID_COLS, screen_height // GRID_ROWS
+
 
 BG_COLOR = (255,255,255)
 GRID_COLOR = (0,0,0)

@@ -156,12 +156,12 @@ class Board:
                 targets.add((stop_c, stop_r))
         return targets
 
-    def draw(self, surface: pygame.Surface) -> None:
+    def draw(self, surface: pygame.Surface, screen_width: int, screen_height: int) -> None:
         for (col, row) in self.center_block_cells:
-            rect = cell_rect(col, row)
+            rect = cell_rect(col, row, screen_width, screen_height)
             pygame.draw.rect(surface, CENTER_BLOCK_COLOR, rect)
         for col in range(self.cols):
             for row in range(self.rows):
-                self.cells[col][row].draw(surface)
+                self.cells[col][row].draw(surface, screen_width, screen_height)
         for wall in self.walls:
-            wall.draw(surface)
+            wall.draw(surface, screen_width, screen_height)
