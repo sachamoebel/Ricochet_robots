@@ -1,8 +1,17 @@
 import pygame
-import random
+from dataclasses import dataclass
 from typing import Set, Tuple, List, FrozenSet
-from config import GRID_COLS, GRID_ROWS, CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS
+from config import GRID_COLS, GRID_ROWS, CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS, ROBOT_COLORS
 from entities import Cell, Wall, cell_rect
+
+
+@dataclass
+class Objective:
+    col: int
+    row: int
+    color: tuple[int, int, int]
+    symbol: str
+    is_multicolor: bool = False
 
 
 class Board:
@@ -22,43 +31,54 @@ class Board:
         self.blocked_cells: Set[Tuple[int, int]] = set(self.center_block_cells)
         self.walls: List[Wall] = []
         self.blocked_edges: Set[FrozenSet[Tuple[int, int]]] = set()
-        self._create_random_walls()
+        self.objectives: List[Objective] = []
+        self._create_fixed_walls()
         self._build_blocked_edges()
+        self._create_objectives()
 
-    def _neighbors_4(self, c: int, r: int) -> Set[Tuple[int, int]]:
-        res: Set[Tuple[int, int]] = set()
-        for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            nc = c + dc
-            nr = r + dr
-            if 0 <= nc < self.cols and 0 <= nr < self.rows:
-                res.add((nc, nr))
-        return res
-
-    def _cells_for_wall(self, col: int, row: int) -> Set[Tuple[int, int]]:
-        return {(col, row)}
-
-    def _create_random_walls(self) -> None:
-        min_walls = 8
-        max_walls = 20
-        n_walls = random.randint(min_walls, max_walls)
-        forbidden: Set[Tuple[int, int]] = set()
-        attempts = 0
-        max_attempts = n_walls * 40
-        while len(self.walls) < n_walls and attempts < max_attempts:
-            attempts += 1
-            kind = "L"
-            angle = random.choice([0, 90, 180, 270])
-            col = random.randint(0, self.cols - 1)
-            row = random.randint(0, self.rows - 1)
-            if (col, row) in self.center_block_cells:
-                continue
-            wall_cells = self._cells_for_wall(col, row)
-            if any(cell in forbidden for cell in wall_cells):
-                continue
-            self.walls.append(Wall(col=col, row=row, angle=angle, kind=kind))
-            for c, r in wall_cells:
-                forbidden.add((c, r))
-                forbidden.update(self._neighbors_4(c, r))
+    def _create_fixed_walls(self) -> None:
+        quadrant_walls = {
+            "TL": [
+                (1, 1, 0),
+                (3, 4, 90),
+                (5, 2, 180),
+                (2, 7, 270),
+                (6, 5, 180),
+            ],
+            "TR": [
+                (1, 3, 270),
+                (2, 6, 0),
+                (4, 2, 90),
+                (5, 5, 180),
+            ],
+            "BL": [
+                (4, 2, 0),
+                (1, 4, 90),
+                (4, 6, 180),
+                (2, 3, 270),
+            ],
+            "BR": [
+                (3, 1, 270),
+                (6, 3, 0),
+                (1, 5, 90),
+                (2, 4, 0),
+            ],
+        }
+        base_offsets = {
+            "TL": (0, 0),
+            "TR": (8, 0),
+            "BL": (0, 8),
+            "BR": (8, 8),
+        }
+        self.walls = []
+        for quadrant_name, walls_local in quadrant_walls.items():
+            base_col, base_row = base_offsets[quadrant_name]
+            for local_col, local_row, angle in walls_local:
+                col = base_col + local_col
+                row = base_row + local_row
+                if (col, row) in self.center_block_cells:
+                    continue
+                self.walls.append(Wall(col=col, row=row, angle=angle, kind="L"))
 
     def _add_edge_block(self, c1: int, r1: int, c2: int, r2: int) -> None:
         if 0 <= c1 < self.cols and 0 <= r1 < self.rows and 0 <= c2 < self.cols and 0 <= r2 < self.rows:
@@ -82,6 +102,38 @@ class Board:
                 elif wall.angle == 270:
                     self._add_edge_block(c, r, c, r + 1)
                     self._add_edge_block(c, r, c - 1, r)
+
+    def _create_objectives(self) -> None:
+        self.objectives = []
+        layout = [
+            (1, 1, 0, "diamond", False),
+            (3, 4, 1, "square", False),
+            (5, 2, 2, "triangle", False),
+            (2, 7, 3, "diamond", False),
+            (4, 10, 0, "square", False),
+            (1, 12, 1, "triangle", False),
+            (6, 5, 2, "diamond", False),
+            (9, 3, 3, "square", False),
+            (10, 6, 0, "triangle", False),
+            (12, 2, 1, "diamond", False),
+            (13, 5, 2, "square", False),
+            (11, 9, 3, "triangle", False),
+            (14, 11, 0, "diamond", False),
+            (9, 13, 1, "square", False),
+            (4, 14, 2, "triangle", False),
+            (2, 11, 3, "diamond", False),
+            (10, 12, 0, "square", True),
+        ]
+        for col, row, color_index, symbol, is_multi in layout:
+            if (col, row) in self.center_block_cells:
+                continue
+            if is_multi:
+                color = (255, 255, 255)
+                obj = Objective(col=col, row=row, color=color, symbol=symbol, is_multicolor=True)
+            else:
+                color = ROBOT_COLORS[color_index % len(ROBOT_COLORS)]
+                obj = Objective(col=col, row=row, color=color, symbol=symbol, is_multicolor=False)
+            self.objectives.append(obj)
 
     def is_blocked(self, col: int, row: int) -> bool:
         return (col, row) in self.blocked_cells
@@ -120,6 +172,33 @@ class Board:
                 targets.add((stop_c, stop_r))
         return targets
 
+    def _draw_objective(self, surface: pygame.Surface, screen_width: int, screen_height: int, obj: Objective) -> None:
+        rect = cell_rect(obj.col, obj.row, screen_width, screen_height)
+        cx = rect.centerx
+        cy = rect.centery
+        size = rect.width // 4
+        if obj.symbol == "diamond":
+            points = [
+                (cx, cy - size),
+                (cx + size, cy),
+                (cx, cy + size),
+                (cx - size, cy),
+            ]
+            pygame.draw.polygon(surface, obj.color, points)
+        elif obj.symbol == "square":
+            inner = pygame.Rect(0, 0, size * 2, size * 2)
+            inner.center = (cx, cy)
+            pygame.draw.rect(surface, obj.color, inner)
+        elif obj.symbol == "circle":
+            pygame.draw.circle(surface, obj.color, (cx, cy), size)
+        elif obj.symbol == "triangle":
+            points = [
+                (cx, cy - size),
+                (cx + size, cy + size),
+                (cx - size, cy + size),
+            ]
+            pygame.draw.polygon(surface, obj.color, points)
+
     def draw(self, surface: pygame.Surface, screen_width: int, screen_height: int) -> None:
         for (col, row) in self.center_block_cells:
             rect = cell_rect(col, row, screen_width, screen_height)
@@ -129,5 +208,7 @@ class Board:
                 self.cells[col][row].draw(surface, screen_width, screen_height)
         for wall in self.walls:
             wall.draw(surface, screen_width, screen_height)
+        for obj in self.objectives:
+            self._draw_objective(surface, screen_width, screen_height, obj)
         border_rect = pygame.Rect(0, 0, screen_width, screen_height)
         pygame.draw.rect(surface, WALL_COLOR, border_rect, WALL_THICKNESS)
