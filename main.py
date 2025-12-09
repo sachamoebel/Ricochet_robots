@@ -125,12 +125,6 @@ class Game:
                         self.selected_robot = None
                         self.reachable_cells.clear()
 
-            elif event.type == pygame.VIDEORESIZE:
-                # On NE rappelle PAS set_mode ici.
-                # On laisse juste Pygame redimensionner la surface.
-                # Tout le rendu utilise self.screen.get_size() à chaque frame.
-                pass
-
     def update(self) -> None:
         pass
 
