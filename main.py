@@ -190,10 +190,6 @@ class Game:
         title_rect = title_surf.get_rect(center=(width // 2, int(height * 0.28)))
         self.screen.blit(title_surf, title_rect)
 
-        subtitle_surf = self.subtitle_font.render("Un puzzle de robots glissants", True, MENU_SUBTITLE_COLOR)
-        subtitle_rect = subtitle_surf.get_rect(center=(width // 2, int(height * 0.38)))
-        self.screen.blit(subtitle_surf, subtitle_rect)
-
         mouse_x, mouse_y = pygame.mouse.get_pos()
         buttons = self._get_main_menu_buttons(width, height)
 
