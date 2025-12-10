@@ -584,7 +584,7 @@ class Game:
             self.screen.blit(header, (cx, cy))
             cy += 26
             lines = [
-                "← / → : changer de joueur",
+                "<- / -> : changer de joueur",
                 "1–9 : saisir une annonce",
                 "Entrée : lancer la résolution",
             ]
