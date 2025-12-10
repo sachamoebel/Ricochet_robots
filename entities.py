@@ -1,11 +1,8 @@
 import pygame
 from dataclasses import dataclass
-from config import (
-    get_cell_size,
-    GRID_COLOR,
-    WALL_COLOR,
-    WALL_THICKNESS,
-)
+from config import get_cell_size, GRID_COLOR, WALL_COLOR, WALL_THICKNESS
+
+GridPosition = tuple[int, int]
 
 
 def grid_to_pixel_center(col: int, row: int, screen_width: int, screen_height: int) -> tuple[int, int]:
@@ -17,12 +14,7 @@ def grid_to_pixel_center(col: int, row: int, screen_width: int, screen_height: i
 
 def cell_rect(col: int, row: int, screen_width: int, screen_height: int) -> pygame.Rect:
     cell_w, cell_h = get_cell_size(screen_width, screen_height)
-    return pygame.Rect(
-        col * cell_w,
-        row * cell_h,
-        cell_w,
-        cell_h,
-    )
+    return pygame.Rect(col * cell_w, row * cell_h, cell_w, cell_h)
 
 
 @dataclass

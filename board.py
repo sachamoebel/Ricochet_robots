@@ -1,11 +1,12 @@
-import pygame
 from dataclasses import dataclass
-from typing import Set, Tuple, List, FrozenSet
-from config import GRID_COLS, GRID_ROWS, CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS, ROBOT_COLORS
-from entities import Cell, Wall, cell_rect
+from typing import FrozenSet, List, Set, Tuple
+from config import ROBOT_COLORS
+from entities import Wall
+
+GridPosition = Tuple[int, int]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Objective:
     col: int
     row: int
@@ -18,20 +19,22 @@ class Board:
     def __init__(self, cols: int, rows: int) -> None:
         self.cols = cols
         self.rows = rows
-        self.cells: List[List[Cell]] = [
-            [Cell(col, row) for row in range(rows)]
-            for col in range(cols)
-        ]
-        self.center_block_cells: Set[Tuple[int, int]] = {
-            (7, 7),
-            (7, 8),
-            (8, 7),
-            (8, 8),
+
+        center_col = cols // 2
+        center_row = rows // 2
+        self.center_block_cells: Set[GridPosition] = {
+            (center_col - 1, center_row - 1),
+            (center_col - 1, center_row),
+            (center_col, center_row - 1),
+            (center_col, center_row),
         }
-        self.blocked_cells: Set[Tuple[int, int]] = set(self.center_block_cells)
+
+        self.blocked_cells: Set[GridPosition] = set(self.center_block_cells)
+
         self.walls: List[Wall] = []
-        self.blocked_edges: Set[FrozenSet[Tuple[int, int]]] = set()
+        self.blocked_edges: Set[FrozenSet[GridPosition]] = set()
         self.objectives: List[Objective] = []
+
         self._create_fixed_walls()
         self._build_blocked_edges()
         self._create_objectives()
@@ -64,13 +67,17 @@ class Board:
                 (2, 4, 0),
             ],
         }
+
+        half_cols = self.cols // 2
+        half_rows = self.rows // 2
         base_offsets = {
             "TL": (0, 0),
-            "TR": (8, 0),
-            "BL": (0, 8),
-            "BR": (8, 8),
+            "TR": (half_cols, 0),
+            "BL": (0, half_rows),
+            "BR": (half_cols, half_rows),
         }
-        self.walls = []
+
+        self.walls.clear()
         for quadrant_name, walls_local in quadrant_walls.items():
             base_col, base_row = base_offsets[quadrant_name]
             for local_col, local_row, angle in walls_local:
@@ -81,7 +88,12 @@ class Board:
                 self.walls.append(Wall(col=col, row=row, angle=angle, kind="L"))
 
     def _add_edge_block(self, c1: int, r1: int, c2: int, r2: int) -> None:
-        if 0 <= c1 < self.cols and 0 <= r1 < self.rows and 0 <= c2 < self.cols and 0 <= r2 < self.rows:
+        if (
+            0 <= c1 < self.cols
+            and 0 <= r1 < self.rows
+            and 0 <= c2 < self.cols
+            and 0 <= r2 < self.rows
+        ):
             self.blocked_edges.add(frozenset({(c1, r1), (c2, r2)}))
 
     def _build_blocked_edges(self) -> None:
@@ -89,19 +101,21 @@ class Board:
         for wall in self.walls:
             c = wall.col
             r = wall.row
-            if wall.kind == "L":
-                if wall.angle == 0:
-                    self._add_edge_block(c, r, c, r - 1)
-                    self._add_edge_block(c, r, c - 1, r)
-                elif wall.angle == 90:
-                    self._add_edge_block(c, r, c, r - 1)
-                    self._add_edge_block(c, r, c + 1, r)
-                elif wall.angle == 180:
-                    self._add_edge_block(c, r, c, r + 1)
-                    self._add_edge_block(c, r, c + 1, r)
-                elif wall.angle == 270:
-                    self._add_edge_block(c, r, c, r + 1)
-                    self._add_edge_block(c, r, c - 1, r)
+            if wall.kind != "L":
+                continue
+
+            if wall.angle == 0:
+                self._add_edge_block(c, r, c, r - 1)
+                self._add_edge_block(c, r, c - 1, r)
+            elif wall.angle == 90:
+                self._add_edge_block(c, r, c, r - 1)
+                self._add_edge_block(c, r, c + 1, r)
+            elif wall.angle == 180:
+                self._add_edge_block(c, r, c, r + 1)
+                self._add_edge_block(c, r, c + 1, r)
+            elif wall.angle == 270:
+                self._add_edge_block(c, r, c, r + 1)
+                self._add_edge_block(c, r, c - 1, r)
 
     def _create_objectives(self) -> None:
         self.objectives = []
@@ -142,73 +156,40 @@ class Board:
         self,
         start_col: int,
         start_row: int,
-        occupied: Set[Tuple[int, int]],
-    ) -> Set[Tuple[int, int]]:
-        targets: Set[Tuple[int, int]] = set()
+        occupied: Set[GridPosition],
+    ) -> Set[GridPosition]:
+        targets: Set[GridPosition] = set()
         directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+
         for dx, dy in directions:
             c = start_col
             r = start_row
             obstacle_found = False
             stop_c = start_col
             stop_r = start_row
+
             while True:
                 nx = c + dx
                 ny = r + dy
+
                 if not (0 <= nx < self.cols and 0 <= ny < self.rows):
                     obstacle_found = True
                     stop_c, stop_r = c, r
                     break
+
                 if frozenset({(c, r), (nx, ny)}) in self.blocked_edges:
                     obstacle_found = True
                     stop_c, stop_r = c, r
                     break
+
                 if self.is_blocked(nx, ny) or (nx, ny) in occupied:
                     obstacle_found = True
                     stop_c, stop_r = c, r
                     break
+
                 c, r = nx, ny
+
             if obstacle_found and (stop_c, stop_r) != (start_col, start_row):
                 targets.add((stop_c, stop_r))
+
         return targets
-
-    def _draw_objective(self, surface: pygame.Surface, screen_width: int, screen_height: int, obj: Objective) -> None:
-        rect = cell_rect(obj.col, obj.row, screen_width, screen_height)
-        cx = rect.centerx
-        cy = rect.centery
-        size = rect.width // 4
-        if obj.symbol == "diamond":
-            points = [
-                (cx, cy - size),
-                (cx + size, cy),
-                (cx, cy + size),
-                (cx - size, cy),
-            ]
-            pygame.draw.polygon(surface, obj.color, points)
-        elif obj.symbol == "square":
-            inner = pygame.Rect(0, 0, size * 2, size * 2)
-            inner.center = (cx, cy)
-            pygame.draw.rect(surface, obj.color, inner)
-        elif obj.symbol == "circle":
-            pygame.draw.circle(surface, obj.color, (cx, cy), size)
-        elif obj.symbol == "triangle":
-            points = [
-                (cx, cy - size),
-                (cx + size, cy + size),
-                (cx - size, cy + size),
-            ]
-            pygame.draw.polygon(surface, obj.color, points)
-
-    def draw(self, surface: pygame.Surface, screen_width: int, screen_height: int) -> None:
-        for (col, row) in self.center_block_cells:
-            rect = cell_rect(col, row, screen_width, screen_height)
-            pygame.draw.rect(surface, CENTER_BLOCK_COLOR, rect)
-        for col in range(self.cols):
-            for row in range(self.rows):
-                self.cells[col][row].draw(surface, screen_width, screen_height)
-        for wall in self.walls:
-            wall.draw(surface, screen_width, screen_height)
-        for obj in self.objectives:
-            self._draw_objective(surface, screen_width, screen_height, obj)
-        border_rect = pygame.Rect(0, 0, screen_width, screen_height)
-        pygame.draw.rect(surface, WALL_COLOR, border_rect, WALL_THICKNESS)

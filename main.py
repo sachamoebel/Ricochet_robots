@@ -1,6 +1,5 @@
 import pygame
 import random
-from dataclasses import dataclass
 
 from config import (
     SCREEN_WIDTH,
@@ -23,15 +22,11 @@ from config import (
     MENU_BUTTON_HOVER_COLOR,
     MENU_BUTTON_TEXT_COLOR,
 )
-from board import Board, Objective
+from board import Board
+from board_render import BoardRenderer
 from entities import Robot, grid_to_pixel_center, cell_rect
-
-
-@dataclass
-class Player:
-    name: str
-    score: int = 0
-    bid: int | None = None
+from game_phase import GamePhase
+from player import Player
 
 
 class Game:
@@ -46,6 +41,7 @@ class Game:
         self.running = True
 
         self.board = Board(GRID_COLS, GRID_ROWS)
+        self.board_renderer = BoardRenderer(self.board)
 
         width, height = self.screen.get_size()
         board_width = int(width * 0.75)
@@ -63,8 +59,8 @@ class Game:
 
         self.selected_robot: Robot | None = None
         self.reachable_cells: set[tuple[int, int]] = set()
-        self.current_objective: Objective | None = None
-        self.remaining_objectives: list[Objective] = self.board.objectives[:]
+        self.current_objective = None
+        self.remaining_objectives = self.board.objectives[:]
         self.target_robot_index: int | None = None
         self.move_count: int = 0
         self.round_index: int = 1
@@ -74,7 +70,7 @@ class Game:
         self.title_font = pygame.font.SysFont(None, 96)
         self.subtitle_font = pygame.font.SysFont(None, 32)
 
-        self.state: str = "main_menu"
+        self.state: GamePhase = GamePhase.MAIN_MENU
         self.sand_timer: float = SAND_TIMER_DURATION
         self.bidding_started: bool = False
         self.bid_order: list[int] = []
@@ -124,14 +120,14 @@ class Game:
         for p in self.players:
             p.bid = None
         if not self._pick_next_objective():
-            self.state = "game_over"
+            self.state = GamePhase.GAME_OVER
             self.current_objective = None
             self.active_player_index = None
             return
-        self.state = "bidding"
+        self.state = GamePhase.BIDDING
 
     def _end_bidding(self) -> None:
-        if self.state != "bidding":
+        if self.state != GamePhase.BIDDING:
             return
         bidders = [(p.bid, i) for i, p in enumerate(self.players) if p.bid is not None]
         if not bidders:
@@ -144,7 +140,7 @@ class Game:
         self.bid_order = [idx for _, idx in bidders]
         self.current_solver_index = 0
         self.active_player_index = self.bid_order[0]
-        self.state = "solving"
+        self.state = GamePhase.SOLVING
         self.move_count = 0
         self.selected_robot = None
         self.reachable_cells.clear()
@@ -189,7 +185,7 @@ class Game:
             p.bid = None
         self.current_objective = None
         self.active_player_index = None
-        self.state = "main_menu"
+        self.state = GamePhase.MAIN_MENU
 
     def run(self) -> None:
         while self.running:
@@ -350,17 +346,17 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
-                elif self.state == "main_menu":
+                elif self.state == GamePhase.MAIN_MENU:
                     if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                        self.state = "choose_players"
-                elif self.state == "choose_players":
+                        self.state = GamePhase.CHOOSE_PLAYERS
+                elif self.state == GamePhase.CHOOSE_PLAYERS:
                     if event.key in (pygame.K_LEFT, pygame.K_DOWN):
                         self.num_players = max(1, self.num_players - 1)
                     elif event.key in (pygame.K_RIGHT, pygame.K_UP):
                         self.num_players = min(8, self.num_players + 1)
                     elif event.key == pygame.K_RETURN:
                         self._confirm_players_and_start()
-                elif self.state == "bidding":
+                elif self.state == GamePhase.BIDDING:
                     if event.key == pygame.K_RIGHT and self.players:
                         self.current_player_selection = (self.current_player_selection + 1) % len(self.players)
                     elif event.key == pygame.K_LEFT and self.players:
@@ -373,18 +369,18 @@ class Game:
                             self.sand_timer = SAND_TIMER_DURATION
                     elif event.key == pygame.K_RETURN:
                         self._end_bidding()
-                elif self.state == "game_over":
+                elif self.state == GamePhase.GAME_OVER:
                     if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                         self._reset_to_main_menu()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.state == "main_menu":
+                if self.state == GamePhase.MAIN_MENU:
                     width, height = self.screen.get_size()
                     buttons = self._get_main_menu_buttons(width, height)
                     if buttons["play"].collidepoint(event.pos):
-                        self.state = "choose_players"
+                        self.state = GamePhase.CHOOSE_PLAYERS
                     elif buttons["quit"].collidepoint(event.pos):
                         self.running = False
-                elif self.state == "choose_players":
+                elif self.state == GamePhase.CHOOSE_PLAYERS:
                     width, height = self.screen.get_size()
                     layout = self._get_player_select_layout(width, height)
                     if layout["minus"].collidepoint(event.pos):
@@ -394,8 +390,8 @@ class Game:
                     elif layout["start"].collidepoint(event.pos):
                         self._confirm_players_and_start()
                     elif layout["back"].collidepoint(event.pos):
-                        self.state = "main_menu"
-                elif self.state == "solving":
+                        self.state = GamePhase.MAIN_MENU
+                elif self.state == GamePhase.SOLVING:
                     width, height = self.screen.get_size()
                     board_width = int(width * 0.75)
                     board_height = height
@@ -430,12 +426,12 @@ class Game:
                             self.reachable_cells.clear()
 
     def update(self, dt: float) -> None:
-        if self.state == "bidding":
+        if self.state == GamePhase.BIDDING:
             if self.bidding_started:
                 self.sand_timer -= dt
                 if self.sand_timer <= 0:
                     self._end_bidding()
-        elif self.state == "solving" and self.current_objective is not None:
+        elif self.state == GamePhase.SOLVING and self.current_objective is not None:
             current_player = None
             if self.active_player_index is not None and 0 <= self.active_player_index < len(self.players):
                 current_player = self.players[self.active_player_index]
@@ -501,9 +497,9 @@ class Game:
         header_rect = panel_rect.copy()
         header_rect.height = 80
         pygame.draw.rect(self.screen, MENU_BUTTON_COLOR, header_rect)
-        if self.state == "bidding":
+        if self.state == GamePhase.BIDDING:
             phase_label = "Annonce"
-        elif self.state == "solving":
+        elif self.state == GamePhase.SOLVING:
             phase_label = "Solution"
         else:
             phase_label = ""
@@ -532,7 +528,7 @@ class Game:
             info_rect = info_surf.get_rect(topleft=(circle_x + 24, target_rect.y + 36))
             self.screen.blit(info_surf, info_rect)
             y = target_rect.bottom + 16
-        if self.state == "bidding":
+        if self.state == GamePhase.BIDDING:
             timer_rect = pygame.Rect(panel_rect.x + 12, y, panel_rect.width - 24, 72)
             pygame.draw.rect(self.screen, (255, 255, 255), timer_rect, border_radius=12)
             pygame.draw.rect(self.screen, MENU_BUTTON_COLOR, timer_rect, 1, border_radius=12)
@@ -555,9 +551,9 @@ class Game:
             row_rect = pygame.Rect(panel_rect.x + 12, y, panel_rect.width - 24, row_height)
             base_color = (245, 245, 245)
             highlight_color = base_color
-            if self.state == "bidding" and i == self.current_player_selection:
+            if self.state == GamePhase.BIDDING and i == self.current_player_selection:
                 highlight_color = MENU_BUTTON_COLOR
-            elif self.state == "solving" and self.active_player_index is not None and i == self.active_player_index:
+            elif self.state == GamePhase.SOLVING and self.active_player_index is not None and i == self.active_player_index:
                 highlight_color = MENU_BUTTON_HOVER_COLOR
             pygame.draw.rect(self.screen, highlight_color, row_rect, border_radius=10)
             pygame.draw.rect(self.screen, MENU_BUTTON_COLOR, row_rect, 1, border_radius=10)
@@ -583,7 +579,7 @@ class Game:
         pygame.draw.rect(self.screen, MENU_BUTTON_COLOR, controls_rect, 1, border_radius=10)
         cx = controls_rect.x + 14
         cy = controls_rect.y + 12
-        if self.state == "bidding":
+        if self.state == GamePhase.BIDDING:
             header = self.font.render("Annonces", True, HUD_TEXT_COLOR)
             self.screen.blit(header, (cx, cy))
             cy += 26
@@ -613,22 +609,22 @@ class Game:
 
     def draw(self) -> None:
         width, height = self.screen.get_size()
-        if self.state == "main_menu":
+        if self.state == GamePhase.MAIN_MENU:
             self._draw_main_menu(width, height)
             pygame.display.flip()
             return
-        if self.state == "choose_players":
+        if self.state == GamePhase.CHOOSE_PLAYERS:
             self._draw_player_select_screen(width, height)
             pygame.display.flip()
             return
-        if self.state == "game_over":
+        if self.state == GamePhase.GAME_OVER:
             self._draw_game_over(width, height)
             pygame.display.flip()
             return
         self.screen.fill(BG_COLOR)
         board_width = int(width * 0.75)
         board_height = height
-        self.board.draw(self.screen, board_width, board_height)
+        self.board_renderer.draw(self.screen, board_width, board_height)
         self._draw_goal_cell_highlight(board_width, board_height)
         if self.target_robot_index is not None and 0 <= self.target_robot_index < len(self.robots):
             for idx, robot in enumerate(self.robots):
