@@ -1,4 +1,5 @@
 import pygame
+import math
 from config import CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS
 from board import Board, Objective
 from entities import Cell, cell_rect
@@ -40,6 +41,16 @@ class BoardRenderer:
                 (cx + size, cy + size),
                 (cx - size, cy + size),
             ]
+            pygame.draw.polygon(surface, obj.color, points)
+        elif obj.symbol == "pentagon":
+            points = []
+            for i in range(5):
+                angle_deg = 72 * i - 90 
+                angle_rad = math.radians(angle_deg)
+                points.append((
+                    cx + size * math.cos(angle_rad),
+                    cy + size * math.sin(angle_rad)
+                ))
             pygame.draw.polygon(surface, obj.color, points)
 
     def draw(self, surface: pygame.Surface, screen_width: int, screen_height: int) -> None:
