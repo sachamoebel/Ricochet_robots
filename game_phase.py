@@ -6,4 +6,4 @@ class GamePhase(str, Enum):
     BIDDING = "bidding"
     SOLVING = "solving"
     GAME_OVER = "game_over"
-    SHOWING_SOLUTION = "showing solution"
+    SHOWING_SOLUTION = "showing_solution"
