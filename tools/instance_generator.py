@@ -2,12 +2,11 @@ import time
 import random
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from solver import RicochetSolver
 from collections import defaultdict
 import numpy as np
 import pickle
-from solver import RicochetSolver as SolverV1
-from solverV2 import SolverV2
+from src.ai.standard_solver import RicochetSolver as SolverV1
+from src.ai.advanced_solver import SolverV2
 
 
 uncompleted_boards = []

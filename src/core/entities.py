@@ -1,6 +1,6 @@
 import pygame
 from dataclasses import dataclass
-from config import get_cell_size, GRID_COLOR, WALL_COLOR, WALL_THICKNESS
+from src.core.config import get_cell_size, GRID_COLOR, WALL_COLOR, WALL_THICKNESS
 
 GridPosition = tuple[int, int]
 

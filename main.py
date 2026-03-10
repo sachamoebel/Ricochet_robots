@@ -2,10 +2,11 @@ import math
 import pygame
 import random
 import time
-from solver import RicochetSolver
-from solver_thread import SolverThread
+from src.ai.standard_solver import RicochetSolver
+from src.ai.solver_thread import SolverThread
+import tools.instance_generator as IG
 
-from config import (
+from src.core.config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, BG_COLOR, GRID_COLS, GRID_ROWS,
     SELECT_TARGET_COLOR, ROBOT_COLORS, TARGET_CENTER_COLOR,
     GOAL_OUTLINE_COLOR, get_cell_size, SAND_TIMER_DURATION,
@@ -13,11 +14,11 @@ from config import (
     MENU_SUBTITLE_COLOR, MENU_BUTTON_COLOR, MENU_BUTTON_HOVER_COLOR,
     MENU_BUTTON_TEXT_COLOR,
 )
-from board import Board
-from board_render import BoardRenderer
-from entities import Robot, grid_to_pixel_center, cell_rect
-from game_phase import GamePhase
-from player import Player
+from src.core.board import Board
+from src.ui.board_render import BoardRenderer
+from src.core.entities import Robot, grid_to_pixel_center, cell_rect
+from src.ui.game_phase import GamePhase
+from src.ui.player import Player
 
 
 class Game:
@@ -676,8 +677,6 @@ class Game:
             self.draw()
         pygame.quit()
 
-
-import instance_generator as IG
 
 if __name__ == "__main__":
     Game().run()

@@ -1,8 +1,8 @@
 import pygame
 import math
-from config import CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS
-from board import Board, Objective
-from entities import Cell, cell_rect
+from src.core.config import CENTER_BLOCK_COLOR, WALL_COLOR, WALL_THICKNESS
+from src.core.board import Board, Objective
+from src.core.entities import Cell, cell_rect
 
 
 class BoardRenderer:

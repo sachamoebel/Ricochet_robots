@@ -1,4 +1,3 @@
-# solver.py
 import heapq
 import collections
 import time

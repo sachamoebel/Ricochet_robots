@@ -3,9 +3,9 @@ import time
 import random
 import collections
 import heapq
-from instance_generator import GeneratedBoard
-from solver import RicochetSolver
-from solverV2 import SolverV2 
+from tools.instance_generator import GeneratedBoard
+from src.ai.standard_solver import RicochetSolver
+from src.ai.advanced_solver import SolverV2 
 
 try:
     with open("difficult_boards.pkl", "rb") as f:
@@ -51,7 +51,7 @@ def run_test():
         print(f"\nRe-testing Case #{i+1}...")
         
         solver1 = RicochetSolver(board)
-        solver2 = Solver(board)
+        solver2 = SolverV2(board)
 
         start_time2 = time.time()
         path2 = solver2.solve(start_pos, target_robot_idx=target_idx, target_cell=target_cell)
@@ -62,17 +62,17 @@ def run_test():
         duration = time.time() - start_time
 
         if path:
-            print(f"✅ Solved in {duration:.4f}s ({len(path)} moves)")
+            print(f"Solved in {duration:.4f}s ({len(path)} moves)")
             success_count += 1
         else:
-            print(f"❌ Failed again ({duration:.4f}s)")
+            print(f"Failed again ({duration:.4f}s)")
 
 
         if path2:
-            print(f"✅ Solved in {duration2:.4f}s ({len(path2)} moves)")
+            print(f"Solved in {duration2:.4f}s ({len(path2)} moves)")
             success_count += 1
         else:
-            print(f"❌ Failed again ({duration2:.4f}s)")
+            print(f"Failed again ({duration2:.4f}s)")
         continue
     print(f"\nSummary: Solved {success_count}/{len(cases)}")
 

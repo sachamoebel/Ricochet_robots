@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Set, Tuple, FrozenSet
-from config import ROBOT_COLORS
-from entities import Wall
+from src.core.config import ROBOT_COLORS
+from src.core.entities import Wall
 
 @dataclass(frozen=True)
 class Objective:
