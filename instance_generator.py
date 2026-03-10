@@ -6,8 +6,8 @@ from solver import RicochetSolver
 from collections import defaultdict
 import numpy as np
 import pickle
+from solver import RicochetSolver as SolverV1
 from solverV2 import SolverV2
-from solverV3 import SolverV3
 
 
 uncompleted_boards = []
@@ -23,7 +23,6 @@ class GeneratedBoard:
         self.blocked_mask = 0
         
         self.corner_cells = [] 
-        # On utilise reserved_cells pour s'assurer qu'aucun angle ne se touche
         self.reserved_cells = set() 
 
     def pos_to_bit(self, c, r):
@@ -47,13 +46,8 @@ class GeneratedBoard:
             if c > 0: self.walls_right |= self.pos_to_bit(c - 1, r)
 
     def generate(self):
-        # 1. Murs de bordure extérieure et bloc central
         self._setup_perimeter_and_center()
 
-        # 2. Placer les 8 murs extérieurs (2 par quart, perpendiculaires au bord)
-        #self._place_8_border_walls()
-
-        # Définition des zones de quadrants pour les angles (1 à 14 pour éviter bords)
         mid = self.cols // 2
         quadrants = [
             (range(1, mid), range(1, mid)),          # TL
@@ -62,12 +56,10 @@ class GeneratedBoard:
             (range(mid, self.cols-1), range(mid, self.rows-1)) # BR
         ]
 
-        # 3. Placer 4 angles par quart (16 au total)
         for c_range, r_range in quadrants:
             for _ in range(4):
                 self._place_random_angle(c_range, r_range)
 
-        # 4. Placer le 17ème angle bonus dans un quart aléatoire
         bonus_q = random.choice(quadrants)
         self._place_random_angle(bonus_q[0], bonus_q[1])
 
@@ -144,15 +136,14 @@ class GeneratedBoard:
             return True
         return False
     
-
-def generate_instance(n: int, num_helpers: int):
-    board = GeneratedBoard(n)
+# Generate board instance according to the boards of the original game 
+def generate_instance(size: int, num_helpers: int):
+    board = GeneratedBoard(size)
     board.generate()
 
-    # Placement des robots (évite le centre)
     robots = []
     while len(robots) < (1 + num_helpers):
-        idx = random.randint(0, n*n-1)
+        idx = random.randint(0, size*size-1)
         if not (board.blocked_mask & (1 << idx)) and idx not in robots:
             robots.append(idx)
             
@@ -183,10 +174,9 @@ def run_benchmark(num_instances=100, size=16, helpers=3, display_stats=True):
     print(f"Benchmark : {num_instances} instances...")
     for i in range(num_instances):
         board, start, target = generate_instance(size, helpers)
-        solver1 = SolverV2(board)
-        solver2 = SolverV3(board)
+        solver1 = SolverV1(board)
+        solver2 = SolverV2(board)
 
-        
         t0 = time.time()
         moves1, nb_noeuds_explores1 = solver1.solve(start, 0, target)
         t1 = time.time()
@@ -230,61 +220,45 @@ def run_benchmark(num_instances=100, size=16, helpers=3, display_stats=True):
 
             plt.figure(figsize=(14, 6))
 
-            # --- Graph 1 : Histogram (Percentage of Instances) ---
-            # We use mv1 (Solver 1) to represent the difficulty distribution of the generated boards
             plt.subplot(1, 2, 1)
             
             if mv1:
-                # Calculate weights to show percentage instead of count
-                # Each item contributes (100 / total)% to the bar
                 weights = [100 / len(mv1)] * len(mv1)
                 bins = range(min(mv1), max(mv1) + 2)
                 
                 plt.hist(mv1, bins=bins, weights=weights, color='skyblue', edgecolor='black', align='left')
                 
-                plt.title("Distribution du nombre de coups minimum")
-                plt.xlabel("Nombre de coups minimum")
-                plt.ylabel("Pourcentage d'instances (%)")
+                plt.title("Distribution of minimum number of moves")
+                plt.xlabel("Minimum number of moves")
+                plt.ylabel("Percentage of instances (%)")
                 plt.grid(axis='y', linestyle='--', alpha=0.7)
-
-
 
             plt.subplot(1, 2, 2)
 
-            # 1. Regrouper les temps par nombre de coups
-            # Structure : {10 coups: [0.5s, 0.6s], 11 coups: [1.2s]...}
             data_map1 = defaultdict(list)
             data_map2 = defaultdict(list)
 
             for s in stats1: data_map1[s['moves']].append(s['time'])
             for s in stats2: data_map2[s['moves']].append(s['time'])
 
-            # 2. Trouver tous les nombres de coups rencontrés (axe X)
             all_moves = sorted(list(set(data_map1.keys()) | set(data_map2.keys())))
             
-            # 3. Calculer les moyennes pour chaque nombre de coups (axe Y)
-            # Si un solveur n'a pas résolu d'instance de ce nombre de coups, moyenne = 0
             means1 = [sum(data_map1[m])/len(data_map1[m]) if m in data_map1 else 0 for m in all_moves]
             means2 = [sum(data_map2[m])/len(data_map2[m]) if m in data_map2 else 0 for m in all_moves]
 
-            # 4. Dessiner les barres côte à côte
             x_indices = range(len(all_moves))
-            width = 0.4  # Largeur des barres
+            width = 0.4
 
-            # Barres du Solver 1 (décalées à gauche)
             plt.bar([x - width/2 for x in x_indices], means1, width=width, 
                     color='cornflowerblue', label='RicochetSolver')
             
-            # Barres du Solver 2 (décalées à droite)
             plt.bar([x + width/2 for x in x_indices], means2, width=width, 
                     color='salmon', label='Solver 2')
 
-            # Configuration de l'axe X
             plt.xticks(x_indices, all_moves)
-            
-            plt.title("Durée moyenne de calcul selon le nombre de coups minimum (en secondes)")
-            plt.xlabel("Nombre de coups minimum")
-            plt.ylabel("Temps moyen (s)")
+            plt.title("Distribution of the average time to solve by minimum number of moves (in seconds)")
+            plt.xlabel("Minimum number of moves")
+            plt.ylabel("Average time (s)")
             plt.legend()
             plt.grid(axis='y', linestyle='--', alpha=0.5)
 

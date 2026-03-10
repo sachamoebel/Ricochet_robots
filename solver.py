@@ -77,15 +77,17 @@ class RicochetSolver:
         queue = [(get_h(start_pos), 0, start_pos, [], (-1, ""))]
         visited = {}
 
+        nb_noeuds_explores = 0
+
         while queue:
+            nb_noeuds_explores += 1
             f, g, positions, path, last_move = heapq.heappop(queue)
             last_r, last_d = last_move
 
-            # Goal check
             if target_robot_idx is not None:
-                if positions[target_robot_idx] == target_cell: return path
+                if positions[target_robot_idx] == target_cell: return path, nb_noeuds_explores
             else:
-                if any(p == target_cell for p in positions): return path
+                if any(p == target_cell for p in positions): return path, nb_noeuds_explores
 
             state_key = (positions, target_robot_idx)
             if visited.get(state_key, 99) <= g: continue

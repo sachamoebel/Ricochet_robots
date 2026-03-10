@@ -1,3 +1,4 @@
+import math
 import pygame
 import random
 import time
@@ -193,6 +194,8 @@ class Game:
         self.sand_timer = SAND_TIMER_DURATION
         self.bidding_started = False
         self.active_player_index = None
+        self.solver_path = None  # On vide le chemin de la manche précédente
+        self.solver_bid = None   # On reset le score
         for p in self.players: p.bid = None
         
         if not self._pick_next_objective():
@@ -299,14 +302,35 @@ class Game:
             elif key == pygame.K_RETURN: self._confirm_players_and_start()
             
         elif self.state == GamePhase.BIDDING:
-            if key == pygame.K_RIGHT: self.current_player_selection = (self.current_player_selection + 1) % len(self.players)
-            elif key == pygame.K_LEFT: self.current_player_selection = (self.current_player_selection - 1) % len(self.players)
-            elif pygame.K_1 <= key <= pygame.K_9:
-                self.players[self.current_player_selection].bid = key - pygame.K_0
+            if key == pygame.K_RIGHT: 
+                self.current_player_selection = (self.current_player_selection + 1) % len(self.players)
+            elif key == pygame.K_LEFT: 
+                self.current_player_selection = (self.current_player_selection - 1) % len(self.players)
+            
+            elif pygame.K_0 <= key <= pygame.K_9:
+                digit = key - pygame.K_0
+                p = self.players[self.current_player_selection]
+                
+                if p.bid is None:
+                    p.bid = digit
+                else:
+                    new_val = p.bid * 10 + digit
+                    if new_val <= 99:
+                        p.bid = new_val
+                
                 if not self.bidding_started:
                     self.bidding_started = True
                     self.sand_timer = SAND_TIMER_DURATION
-            elif key == pygame.K_RETURN: self._end_bidding()
+
+            elif key == pygame.K_BACKSPACE:
+                p = self.players[self.current_player_selection]
+                if p.bid is not None:
+                    p.bid = p.bid // 10
+                    if p.bid == 0 and key == pygame.K_BACKSPACE:
+                        p.bid = None
+
+            elif key == pygame.K_RETURN: 
+                self._end_bidding()
 
         elif self.state == GamePhase.SOLVING and key == pygame.K_s:
             self._trigger_ai_demonstration()
@@ -496,6 +520,16 @@ class Game:
                 (center_x - size, center_y + size),
             ]
             pygame.draw.polygon(self.screen, color, points)
+        elif symbol == "pentagon":
+            points = []
+            for i in range(5):
+                angle_deg = 72 * i - 90 
+                angle_rad = math.radians(angle_deg)
+                points.append((
+                    center_x + size * math.cos(angle_rad),
+                    center_y + size * math.sin(angle_rad)
+                ))
+            pygame.draw.polygon(self.screen, color, points)
 
     def _draw_goal_cell_highlight(self, bw, bh):
         if not self.current_objective: return
@@ -612,11 +646,12 @@ class Game:
         self.screen.blit(self.font.render(header_text, True, HUD_TEXT_COLOR), (cx, cy))
         
         if self.state == GamePhase.BIDDING:
-            lines = ["<- / -> : changer joueur", "1-9 : saisir annonce", "Entrée : valider"]
+            lines = ["<- / -> : changer joueur", "1-99 : saisir annonce", "Entrée : valider"]
         else:
             lines = [f"Coups joués : {self.move_count}"]
             active = self.players[self.active_player_index] if self.active_player_index is not None else None
             if active: lines.append(f"Joueur : {active.name} ({active.bid} max)")
+            lines.append("S : montrer solution IA")
         
         for i, line in enumerate(lines):
             self.screen.blit(self.font.render(line, True, HUD_TEXT_COLOR), (cx, cy + 28 + i * 22))
@@ -642,6 +677,10 @@ class Game:
         pygame.quit()
 
 
+import instance_generator as IG
 
 if __name__ == "__main__":
     Game().run()
+
+    #boards = IG.run_benchmark(100, 16, 3, True)
+    #IG.save_difficult_cases(boards, "generated_instances.json")
