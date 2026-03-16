@@ -289,8 +289,9 @@ def save_difficult_cases(boards, filename="difficult_boards.pkl"):
 
 if __name__ == "__main__":
     try:
+        nb_instances = 100
         if len(sys.argv) > 1 :
             nb_instances = int(sys.argv[1])
-            run_benchmark(nb_instances, 16, 3, True)
+        run_benchmark(nb_instances, 16, 3, True)
     except ValueError as e:
         print(f"Invalid argument for number of instances: {sys.argv[1]}. Please provide an integer.")
