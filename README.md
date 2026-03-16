@@ -65,5 +65,5 @@ python main.py
 
 ### Run the benchmark tool
 ```bash
-python tools/instance_generator.py
+python tools/instance_generator.py number_of_instances
 ```
