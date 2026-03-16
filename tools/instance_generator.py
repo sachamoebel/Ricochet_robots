@@ -1,10 +1,18 @@
 import time
 import random
+import sys
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from collections import defaultdict
 import numpy as np
 import pickle
+
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
+
 from src.ai.standard_solver import RicochetSolver as SolverV1
 from src.ai.advanced_solver import SolverV2
 
@@ -278,3 +286,11 @@ def save_difficult_cases(boards, filename="difficult_boards.pkl"):
         pickle.dump(uncompleted_boards, f)
 
     print("Saved.")
+
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) > 1 :
+            nb_instances = int(sys.argv[1])
+            run_benchmark(nb_instances, 16, 3, True)
+    except ValueError as e:
+        print(f"Invalid argument for number of instances: {sys.argv[1]}. Please provide an integer.")
